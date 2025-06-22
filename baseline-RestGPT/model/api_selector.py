@@ -1,0 +1,209 @@
+from typing import Any, Dict, List, Optional, Tuple
+import re
+import logging
+
+from langchain.chains.base import Chain
+from langchain.chains.llm import LLMChain
+from langchain.prompts.base import BasePromptTemplate
+from langchain.prompts.prompt import PromptTemplate
+from langchain.llms.base import BaseLLM
+
+from utils import ReducedOpenAPISpec, get_matched_endpoint
+
+logger = logging.getLogger(__name__)
+
+
+icl_examples = {
+    "tmdb": """Example 1:
+
+Background: The id of Wong Kar-Wai is 12453
+User query: give me the latest movie directed by Wong Kar-Wai.
+API calling 1: GET /person/12453/movie_credits to get the latest movie directed by Wong Kar-Wai (id 12453)
+API response: The latest movie directed by Wong Kar-Wai is The Grandmaster (id 44865), ...
+
+Example 2:
+
+Background: No background
+User query: search for movies produced by DreamWorks Animation
+API calling 1: GET /search/company to get the id of DreamWorks Animation
+API response: DreamWorks Animation's company_id is 521
+Instruction: Continue. Search for the movies produced by DreamWorks Animation
+API calling 2: GET /discover/movie to get the movies produced by DreamWorks Animation
+API response: Puss in Boots: The Last Wish (id 315162), Shrek (id 808), The Bad Guys (id 629542), ...
+
+Example 3:
+
+Background: The id of the movie Happy Together is 18329
+User query: search for the director of Happy Together
+API calling 1: GET /movie/18329/credits to get the director for the movie Happy Together
+API response: The director of Happy Together is Wong Kar-Wai (12453)
+
+Example 4:
+
+Background: No background
+User query: search for the highest rated movie directed by Wong Kar-Wai
+API calling 1: GET /search/person to search for Wong Kar-Wai
+API response: The id of Wong Kar-Wai is 12453
+Instruction: Continue. Search for the highest rated movie directed by Wong Kar-Wai (id 12453)
+API calling 2: GET /person/12453/movie_credits to get the highest rated movie directed by Wong Kar-Wai (id 12453)
+API response: The highest rated movie directed by Wong Kar-Wai is In the Mood for Love (id 843), ...
+""",
+    "spotify": """Example 1:
+Background: No background
+User query: what is the id of album Kind of Blue.
+API calling 1: GET /search to search for the album "Kind of Blue"
+API response: Kind of Blue's album_id is 1weenld61qoidwYuZ1GESA
+
+Example 2:
+Background: No background
+User query: get the newest album of Lana Del Rey (id 00FQb4jTyendYWaN8pK0wa).
+API calling 1: GET /artists/00FQb4jTyendYWaN8pK0wa/albums to get the newest album of Lana Del Rey (id 00FQb4jTyendYWaN8pK0wa)
+API response: The newest album of Lana Del Rey is Did you know that there's a tunnel under Ocean Blvd (id 5HOHne1wzItQlIYmLXLYfZ), ...
+
+Example 3:
+Background: The ids and names of the tracks of the album 1JnjcAIKQ9TSJFVFierTB8 are Yellow (3AJwUDP919kvQ9QcozQPxg), Viva La Vida (1mea3bSkSGXuIRvnydlB5b)
+User query: append the first song of the newest album 1JnjcAIKQ9TSJFVFierTB8 of Coldplay (id 4gzpq5DPGxSnKTe4SA8HAU) to my player queue.
+API calling 1: POST /me/player/queue to add Yellow (3AJwUDP919kvQ9QcozQPxg) to the player queue
+API response: Yellow is added to the player queue
+""",
+"causal":"""
+
+"""
+}
+
+# Thought: I am finished executing the plan and have the information the user asked for or the data the used asked to create
+# Final Answer: the final output from executing the plan. If the user's query contains filter conditions, you need to filter the results as well. For example, if the user query is "Search for the first person whose name is 'Tom Hanks'", you should filter the results and only output the first person whose name is 'Tom Hanks'.
+API_SELECTOR_PROMPT = """You are a planner that plans a sequence of causal tools api calls to assist with user queries against an API.
+Another API caller will receive your plan call the corresponding APIs and finally give you the result in natural language.
+The API caller also has filtering, sorting functions to post-process the response of APIs. Therefore, if you think the API response should be post-processed, just tell the API caller to do so.
+If you think you have got the final answer, do not make other API calls and just output the answer immediately. For example, the query is search for a person, you should just return the id and name of the person.
+
+----
+
+Here are name and description of available APIs.
+Do not use APIs that are not listed here.
+
+[empty,Determine_collider,Determine_confounder,Determine_edge_directions,condition independent test,Generate Causal,calculate CATE]
+
+empty : If no action needed ,use this tool. Use this tool default. Input is {{"empty":"yes"}}
+Determine_collider : You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a collider between two variables(ie common effect), we use this tool and the input is {{"cg_name":...,"interesting_var":[...]}}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and may be the variable name of the collider. Make sure the causal graph has been generated before using this tool
+Determine_confounder : You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a cofounder (ie common cause) between two variables, we use this tool and the input is {{"cg_name":...,"interesting_var":[...]}}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and the backdoor path that may lead to the existence of the cofounder. Make sure the causal graph has been generated before using this tool
+Determine_edge_directions : You should first generate causal graph and then use this tool.Useful when we are interested in whether there is a direct edge between two variables and the direction of the edge (such as determining whether A directly leads to B)., we use this tool and the input is {{"cg_name"=...,"interesting_var"=[...]}}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is the relationship of two variables (ie A cause B). Make sure the causal graph has been generated before using this tool
+condition independent test : Useful for when you need to test the *** independent or d-separate *** of variable A and variable B condition on variable C. input should be a json with format below {{"filename":...,"interesting_var":[...],"condition":[...]}},"interesting_var" is a list of variables user interested in. for example, if user want to test independent(d-separate) between X and Y condition on Z,W,Q , interesting_var is ["X","Y"], condition is ["Z","W","Q"]. condition is [] if no condition provided
+Generate Causal : Useful for when you need to generate causal graph (or partial causal graph). input should be a json with format below {{"filename":...,"analyse_relationship":...,"interesting_var":[...](Optional)}}.if you want to analyse relationship between variables( such as cause effect, coufounder , Collider), analyse_relationship = "True" and please generate complete causal graph and  interesting_var is [](which means causal graph contain all variables) .if we only need to generate **partial causal graph** (for example, generate a partial causal graph for some variables), interesting_var is used and it's values are list of variables appear in causal graph and analyse_relationship is "False".Further more, if needed, you can analyse variables relationship in causal graph generated by this tool through these tools : Determine_collider,Determine_confounder,Determine_edge_direction
+calculate CATE : Useful for when you need to calculate (conditional) average treatment effect (ATE or CATE, etc. in math function is E(Y(T=T1)-Y(T=T0) | X=x) and means if we use treatment, what uplift we will get from treatment).This tool use double machine learn algorithm to calculate ate. input is  a json with format {{"filename":...,config: {{Y:[...],T:[...],X:[...],T0:...,T1:...}} }}. Y are names of outcome, T are names of treatment, X are names of covariate affect both T and Y (i.e. confounder). T1 and T0 are two different values of T that need to be calculated in ATE. you should extract each name from the description. If the meaning of X is unclear, leave X as []
+
+----
+
+Starting below, you should follow this format:
+
+User query: the query a User wants help with related to the API
+API calling 1: the first api call you want to make.
+API parameters 1: add the parameters to call the tool
+API response: the response of API calling 1
+Instruction: Another model will evaluate whether the user query has been fulfilled. If the instruction contains "continue", then you should make another API call following this instruction.
+... (this API calling n and API response can repeat N times, but most queries can be solved in 1-2 step)
+
+Example :
+User query: I need to generate a causal diagram, and then analyze the causal and independent relationships between variables to judge the correctness of each proposition
+API calling 1: Generate Causal
+API parameters 1: {{"filename": "data.csv", "analyse_relationship": "True"}}
+API response: causal graph named 'data' is generate succeed!  and have written to the memory.
+
+Begin!
+
+User query: {plan}
+API calling 1: {agent_scratchpad}"""
+
+
+
+class APISelector(Chain):
+    llm: BaseLLM
+    scenario: str
+    api_selector_prompt: BasePromptTemplate
+    output_key: str = "result"
+
+    def __init__(self, llm: BaseLLM, scenario: str) -> None:
+
+        
+        # api_name_desc = [f"{endpoint[0]} {endpoint[1].split('.')[0] if endpoint[1] is not None else ''}" for endpoint in api_spec.endpoints]
+        # api_name_desc = '\n'.join(api_name_desc)
+        api_selector_prompt = PromptTemplate(
+            template=API_SELECTOR_PROMPT,
+            input_variables=["plan","agent_scratchpad"],
+        )
+        super().__init__(llm=llm, scenario=scenario, api_selector_prompt=api_selector_prompt)
+
+    @property
+    def _chain_type(self) -> str:
+        return "RestGPT API Selector"
+
+    @property
+    def input_keys(self) -> List[str]:
+        return ["plan", "background"]
+    
+    @property
+    def output_keys(self) -> List[str]:
+        return [self.output_key]
+    
+    @property
+    def observation_prefix(self) -> str:
+        """Prefix to append the observation with."""
+        return "API response: "
+
+    @property
+    def llm_prefix(self) -> str:
+        """Prefix to append the llm call with."""
+        return "API calling {}: "
+    
+    @property
+    def _stop(self) -> List[str]:
+        return [
+            f"\n{self.observation_prefix.rstrip()}",
+            f"\n\t{self.observation_prefix.rstrip()}",
+        ]
+    
+    def _construct_scratchpad(
+        self, history: List[Tuple[str, str]], instruction: str
+    ) -> str:
+        if len(history) == 0:
+            return ""
+        scratchpad = ""
+        for i, (plan, api_plan, execution_res) in enumerate(history):
+            if i != 0:
+                scratchpad += "Instruction: " + plan + "\n"
+            scratchpad += self.llm_prefix.format(i + 1) + api_plan + "\n"
+            scratchpad += self.observation_prefix + execution_res + "\n"
+        scratchpad += "Instruction: " + instruction + "\n"
+        return scratchpad
+    
+    def _call(self, inputs: Dict[str, Any]) -> Dict[str, str]:
+        # inputs: background, plan, (optional) history, instruction
+        if 'history' in inputs:
+            scratchpad = self._construct_scratchpad(inputs['history'], inputs['instruction'])
+        else:
+            scratchpad = ""
+        api_selector_chain = LLMChain(llm=self.llm, prompt=self.api_selector_prompt)
+        api_selector_chain_output = api_selector_chain.run(plan=inputs['plan'], agent_scratchpad=scratchpad, stop=self._stop)
+        
+        api_plan = re.sub(r"API calling \d+: ", "", api_selector_chain_output.splitlines()[0]).strip()
+        api_plan_parameter = re.sub(r"API parameters \d+: ", "", api_selector_chain_output.splitlines()[1]).strip() if len(api_selector_chain_output.splitlines())>1 else None
+        # print(f"my api_plan : {api_plan}")
+        # print(f"my api_plan_parameter : {api_plan_parameter}")
+        
+        # logger.info(f"API Selector: {api_plan}")
+
+        finish = re.match(r"No API call needed.(.*)", api_plan)
+        res = ""
+        if finish is not None:
+            return {"result" : f'{{"api_plan": "{api_plan}" }}'}
+            
+
+        if api_plan not in ['empty','Determine_collider','Determine_confounder','Determine_edge_directions','condition independent test','Generate Causal','calculate CATE']:
+            print("API Selector: The API you called is not in the list of available APIs. Please use another API.")
+            # scratchpad += api_selector_chain_output + "\nThe API you called is not in the list of available APIs. Please use another API.\n"
+            # api_selector_chain_output = api_selector_chain.run(plan=inputs['plan'], agent_scratchpad=scratchpad, stop=self._stop)
+            # api_plan = re.sub(r"API calling \d+: ", "", api_selector_chain_output).strip()
+            # logger.info(f"API Selector: {api_plan}")
+
+        return  {"result" : f'{{"api_plan": "{api_plan}","api_plan_parameter": {api_plan_parameter} }}'}
