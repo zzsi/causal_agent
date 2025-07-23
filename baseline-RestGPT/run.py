@@ -61,7 +61,7 @@ def main():
     warnings.filterwarnings('ignore')
     # requests_wrapper = Requests(headers=headers)
     api_key = ''
-    llm = OpenAI(model_name="gpt-3.5-turbo", temperature=0.0, max_tokens=700)
+    llm = OpenAI(model_name="gpt-4o", temperature=0.0, max_tokens=700)
     rest_gpt = RestGPT(llm,  scenario=scenario, simple_parser=False)
 
     # if scenario == 'tmdb':

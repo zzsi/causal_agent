@@ -300,7 +300,7 @@ ate_tool = Tool(
 
 
 llm = ChatOpenAI(temperature=0.5, openai_api_key=api_key,
-                 model_name="gpt-3.5-turbo",openai_api_base='')
+                 model_name="gpt-4o", openai_api_base='')
 
 prompt = hub.pull("hwchase17/react",api_key='')
 

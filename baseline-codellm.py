@@ -20,7 +20,7 @@ print(now)
 
 api_key = ''
 model = ChatOpenAI(temperature=0.5, openai_api_key=api_key,
-                 model_name="gpt-3.5-turbo",openai_api_base='')
+                 model_name="gpt-4o", openai_api_base='')
 output_name = 'baseline-gpt3.5-ate.jsonl'
 data_loader = Dataloader()
 data_loader.read_data('./dataset_ate_gt.json')
