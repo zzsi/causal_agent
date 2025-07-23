@@ -24,7 +24,6 @@ import numpy as np
 from causallearn.search.ConstraintBased.PC import pc
 from causallearn.utils.cit import fisherz
 from langchain_openai import ChatOpenAI
-from langchain_openai import ChatOpenAI
 import os
 from matplotlib import image as mpimg, pyplot as plt
 import warnings
