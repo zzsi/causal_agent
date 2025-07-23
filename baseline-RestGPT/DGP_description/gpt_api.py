@@ -6,6 +6,7 @@ import openai
 import os
 from dotenv import load_dotenv
 
+
 class Keypool():
     def __init__(self):
         self.api_keys = [
