@@ -12,8 +12,8 @@ from causallearn.utils.cit import mv_fisherz
 from dowhy import CausalModel
 
 from langchain_openai import ChatOpenAI
-from langchain_openai import ChatOpenAI
 import os
+from dotenv import load_dotenv
 from matplotlib import image as mpimg, pyplot as plt
 import warnings
 from langchain.agents import Tool
@@ -26,6 +26,7 @@ from langchain.agents import AgentExecutor, create_react_agent
 warnings.filterwarnings("ignore")
 matplotlib.use('TkAgg')
 import os
+load_dotenv()
 from causallearn.utils.cit import chisq
 from langchain_community.llms import LlamaCpp
 import sys
@@ -47,7 +48,7 @@ name_out_to_in = []
 CG_out_dir = './temp_CG'
 skip = ''
 
-api_key = ''
+api_key = os.getenv("OPENAI_API_KEY", "")
 outer_item = []
 cit_method_name = ''
 
@@ -365,7 +366,7 @@ ate_tool = Tool(
 )
 
 llm = ChatOpenAI(temperature=0.5, openai_api_key=api_key,
-                 model_name="gpt-3.5-turbo",openai_api_base='')
+                 model_name="gpt-4o", openai_api_base='')
 os.environ['ANTHROPIC_API_KEY'] = api_key
 
 prompt = hub.pull("hwchase17/react",api_key='')

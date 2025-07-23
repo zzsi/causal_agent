@@ -12,15 +12,16 @@ from langchain_core.prompts import (
 from langchain_experimental.utilities import PythonREPL
 from langchain_openai import ChatOpenAI
 from util import has_confounder, has_collider, Relationship, Dataloader, CGMemory
+from dotenv import load_dotenv
 
 f = open('result-gpt3.5-baseline/logging/logging_baseline_ate.txt', 'a+', encoding='utf=8')
 sys.stdout = f
 now = datetime.now()
 print(now)
-
-api_key = ''
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY", "")
 model = ChatOpenAI(temperature=0.5, openai_api_key=api_key,
-                 model_name="gpt-3.5-turbo",openai_api_base='')
+                 model_name="gpt-4o", openai_api_base='')
 output_name = 'baseline-gpt3.5-ate.jsonl'
 data_loader = Dataloader()
 data_loader.read_data('./dataset_ate_gt.json')

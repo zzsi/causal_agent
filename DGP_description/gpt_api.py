@@ -4,9 +4,7 @@ import threading
 
 import openai
 import os
-
-api_key = ""
-base_url = ""
+from dotenv import load_dotenv
 
 class Keypool():
     def __init__(self):
@@ -25,17 +23,18 @@ class Keypool():
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-3.5-turbo", api_key="", conversation_list=[],keypool = None,base_url=''):
+    def __init__(self, model="gpt-4o", api_key=None, conversation_list=None, keypool=None, base_url=""):
+        load_dotenv()
         self.model = model
-        self.conversation_list = conversation_list
+        self.conversation_list = conversation_list or []
         self.lock = threading.Lock()
-        openai.api_key = ""
         self.client = openai.OpenAI(
             base_url=base_url,
-            api_key=api_key,
+            api_key=api_key or os.getenv("OPENAI_API_KEY"),
         )
 
-    def call(self, prompt,model = "gpt-3.5-turbo"):
+    def call(self, prompt, model=None):
+        model = model or self.model
         answer = None
         self.conversation_list.append(
             {"role": "system", "content": "You are a helpful instruction-following assistant."})
