@@ -88,3 +88,12 @@ ours code: main_QR.py
 ## resGPT
 
 file folder: baseline-RestGPT
+
+## Docker
+To build the Docker image run:
+
+    ./build.sh
+
+Run the container with:
+
+    OPENAI_API_KEY=sk-... ./run.sh
