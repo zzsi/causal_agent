@@ -8,6 +8,7 @@ import yaml
 # import spotipy
 from langchain.requests import Requests
 from langchain import OpenAI
+from dotenv import load_dotenv
 
 from utils import reduce_openapi_spec, ColorPrint
 from model import RestGPT
@@ -18,6 +19,8 @@ import pandas as pd
 output_name = 'resGPT.jsonl'
 import sys
 from datetime import datetime
+
+load_dotenv()
 
 
 def main():
@@ -60,8 +63,8 @@ def main():
 # 忽略所有警告
     warnings.filterwarnings('ignore')
     # requests_wrapper = Requests(headers=headers)
-    api_key = ''
-    llm = OpenAI(model_name="gpt-4o", temperature=0.0, max_tokens=700)
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    llm = OpenAI(model_name="gpt-4o", temperature=0.0, max_tokens=700, openai_api_key=api_key)
     rest_gpt = RestGPT(llm,  scenario=scenario, simple_parser=False)
 
     # if scenario == 'tmdb':

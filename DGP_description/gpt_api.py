@@ -4,6 +4,7 @@ import threading
 
 import openai
 import os
+from dotenv import load_dotenv
 
 class Keypool():
     def __init__(self):
@@ -22,13 +23,14 @@ class Keypool():
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-4o", api_key="", conversation_list=None, keypool=None, base_url=""):
+    def __init__(self, model="gpt-4o", api_key=None, conversation_list=None, keypool=None, base_url=""):
+        load_dotenv()
         self.model = model
         self.conversation_list = conversation_list or []
         self.lock = threading.Lock()
         self.client = openai.OpenAI(
             base_url=base_url,
-            api_key=api_key,
+            api_key=api_key or os.getenv("OPENAI_API_KEY"),
         )
 
     def call(self, prompt, model=None):

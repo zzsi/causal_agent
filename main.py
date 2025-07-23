@@ -7,6 +7,7 @@ from causallearn.search.ConstraintBased.PC import pc
 from causallearn.utils.cit import fisherz
 from langchain_openai import ChatOpenAI
 import os
+from dotenv import load_dotenv
 from matplotlib import image as mpimg, pyplot as plt
 import warnings
 from langchain.agents import Tool
@@ -20,6 +21,8 @@ matplotlib.use('TkAgg')
 import os
 import sys
 from datetime import datetime
+
+load_dotenv()
 
 # 获取当前时间
 
@@ -37,7 +40,7 @@ name_out_to_in = []
 CG_out_dir = './temp_CG'
 skip = ''
 
-api_key = ''
+api_key = os.getenv("OPENAI_API_KEY", "")
 outer_item = []
 cit_method_name = ''
 

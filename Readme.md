@@ -88,3 +88,13 @@ ours code: main_QR.py
 ## resGPT
 
 file folder: baseline-RestGPT
+
+## Docker
+To build the Docker image run:
+
+    ./build.sh
+
+Run the container with:
+
+1. Copy `.env.example` to `.env` and put your OpenAI key there.
+2. Execute `./run.sh` which mounts the file and runs the app.
