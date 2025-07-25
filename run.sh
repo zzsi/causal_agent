@@ -7,4 +7,4 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-docker run --rm -it -v "$(pwd)/$ENV_FILE:/app/.env" causal_agent "$@"
+docker run --rm -it -v "$(pwd)/$ENV_FILE:/app/.env" -v "$(pwd):/app" causal_agent "$@"

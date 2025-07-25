@@ -1,16 +1,16 @@
 causal_learn==0.1.3.7
 cdt==0.6.0
-econml==0.14.1
+# econml==0.14.1
 GPy==1.13.2
 langchain==0.2.14
 langchain_community==0.2.12
 lightgbm==4.5.0
-matplotlib==3.7.1
+# matplotlib==3.7.1
 networkx>=3.1
-numpy==1.22.4
+numpy==1.26.4
 openai>=1.3.0
-pandas==1.5.1
+pandas>=1.5.1
 python_igraph==0.11.6
-scikit_learn>=1.3
-torch==2.1.2+cu118
+scikit_learn
+torch>=2.1.2
 python-dotenv>=1.0.0

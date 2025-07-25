@@ -16,8 +16,9 @@ from econml.dml import LinearDML
 from util import has_confounder, has_collider, Relationship, Dataloader, CGMemory
 from langchain import hub
 from langchain.agents import AgentExecutor, create_react_agent
+
 warnings.filterwarnings("ignore")
-matplotlib.use('TkAgg')
+matplotlib.use("TkAgg")
 import os
 import sys
 from datetime import datetime
@@ -26,7 +27,7 @@ load_dotenv()
 
 # 获取当前时间
 
-f = open('result_gpt_3.5_ICL/logging/logging-ate.txt', 'a+', encoding='utf=8')
+f = open("result_gpt_3.5_ICL/logging/logging-ate.txt", "a+", encoding="utf=8")
 sys.stdout = f
 now = datetime.now()
 print(now)
@@ -34,18 +35,17 @@ print(now)
 os.environ["LANGCHAIN-API-KEY"] = ""
 # 定义工具
 
-folder = 'DGP_description/data'
-ate_source_folder = 'ATE_source/data'
+folder = "DGP_description/data"
+ate_source_folder = "ATE_source/data"
 name_out_to_in = []
-CG_out_dir = './temp_CG'
-skip = ''
+CG_out_dir = "./temp_CG"
+skip = ""
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 outer_item = []
-cit_method_name = ''
+cit_method_name = ""
 
 from langchain_community.llms.chatglm3 import ChatGLM3
-
 
 
 data = None
@@ -58,30 +58,44 @@ def condition_independent_test(input_str):
         global data, col_name
         print(input_str)
         input_str = json.loads(input_str)
-        index = input_str['interesting_var']
+        index = input_str["interesting_var"]
 
-        condition = None if input_str['condition'] == "None" or input_str['condition'] == [] else input_str['condition']
-        postfix = ''
+        condition = (
+            None
+            if input_str["condition"] == "None" or input_str["condition"] == []
+            else input_str["condition"]
+        )
+        postfix = ""
         if condition is not None:
-            postfix = ' under conditions : ' + ','.join(condition)
-        cit = CIT(data=np.array(data), method='fisherz')
-        pValue = cit(data.columns.get_loc(index[0]), data.columns.get_loc(index[1]),
-                     [data.columns.get_loc(col) for col in condition] if condition is not None else None)
+            postfix = " under conditions : " + ",".join(condition)
+        cit = CIT(data=np.array(data), method="fisherz")
+        pValue = cit(
+            data.columns.get_loc(index[0]),
+            data.columns.get_loc(index[1]),
+            (
+                [data.columns.get_loc(col) for col in condition]
+                if condition is not None
+                else None
+            ),
+        )
 
         if pValue < 0.05:
-            return '''{} and {} is not independent'''.format(index[0], index[1])+postfix
+            return (
+                """{} and {} is not independent""".format(index[0], index[1]) + postfix
+            )
         else:
-            return '''{} and {} is independent'''.format(index[0], index[1])+postfix
+            return """{} and {} is independent""".format(index[0], index[1]) + postfix
     except Exception as e:
         return f"tool raise a error :{e}. please check your input format and input variables."
+
 
 def draw_pydot(pyd):
     tmp_png = pyd.create_png(f="png")
     fp = io.BytesIO(tmp_png)
-    img = mpimg.imread(fp, format='png')
+    img = mpimg.imread(fp, format="png")
     plt.rcParams["figure.figsize"] = [20, 12]
     plt.rcParams["figure.autolayout"] = True
-    plt.axis('off')
+    plt.axis("off")
     plt.imshow(img)
     plt.show()
 
@@ -91,16 +105,28 @@ def generate_causalgraph(input_str):
         global folder, name_out_to_in, memory
         print("\n" + input_str)
         input_str = json.loads(input_str)
-        filename = input_str['filename']
-        method = input_str['method'] if 'method' in input_str.keys() else 'pc'
-        interested_var = input_str['interesting_var'] if 'interesting_var' in input_str.keys() else None
-        analyse_relationship = input_str['analyse_relationship'] if 'analyse_relationship' in input_str.keys() else None
-        config = input_str['config'] if 'config' in input_str.keys() else None
+        filename = input_str["filename"]
+        method = input_str["method"] if "method" in input_str.keys() else "pc"
+        interested_var = (
+            input_str["interesting_var"]
+            if "interesting_var" in input_str.keys()
+            else None
+        )
+        analyse_relationship = (
+            input_str["analyse_relationship"]
+            if "analyse_relationship" in input_str.keys()
+            else None
+        )
+        config = input_str["config"] if "config" in input_str.keys() else None
         print(config)
         data_sum = pd.read_csv(os.path.join(folder, filename), header=None)
         data_sum.columns = name_out_to_in
         data = np.array(data_sum)
-        if interested_var is not None and interested_var != [] and analyse_relationship == "False":
+        if (
+            interested_var is not None
+            and interested_var != []
+            and analyse_relationship == "False"
+        ):
             data = np.array(data_sum[interested_var])
             cg = pc(data, 0.05, fisherz, node_names=interested_var)
         else:
@@ -115,13 +141,13 @@ def generate_causalgraph(input_str):
         return str(e)
 
 
-def prase_data( config, filename):
-    global folder,name_out_to_in
-    Y_name = config['Y'] if 'Y' in config.keys() and config['Y'] != [] else None
-    Z_name = config['Z'] if 'Z' in config.keys() and config['Z'] != [] else None
-    T_name = config['T'] if 'T' in config.keys() and config['T'] != [] else None
-    W_name = config['W'] if 'W' in config.keys() and config['W'] != [] else None
-    X_name = config['X'] if 'X' in config.keys() and config['X'] != [] else None
+def parse_data(config, filename):
+    global folder, name_out_to_in
+    Y_name = config["Y"] if "Y" in config.keys() and config["Y"] != [] else None
+    Z_name = config["Z"] if "Z" in config.keys() and config["Z"] != [] else None
+    T_name = config["T"] if "T" in config.keys() and config["T"] != [] else None
+    W_name = config["W"] if "W" in config.keys() and config["W"] != [] else None
+    X_name = config["X"] if "X" in config.keys() and config["X"] != [] else None
     assert Y_name is not None and T_name is not None
     data = pd.read_csv(os.path.join(folder, filename), header=None)
     data.columns = name_out_to_in
@@ -130,20 +156,20 @@ def prase_data( config, filename):
     Z_mat = data[Z_name] if Z_name is not None else None
     W_mat = data[W_name] if W_name is not None else None
     X_mat = data[X_name] if X_name is not None else None
-    return T_mat, Y_mat, Z_mat, W_mat, X_mat,config['T0'],config['T1']
+    return T_mat, Y_mat, Z_mat, W_mat, X_mat, config["T0"], config["T1"]
 
 
 def ATE_sim(input_str):
     try:
         print("\n" + input_str)
         input_str = json.loads(input_str)
-        filename = input_str['filename']
-        config = input_str['config']
-        T_mat, Y_mat, Z_mat, W_mat, X_mat,T0,T1 = prase_data(config, filename)
+        filename = input_str["filename"]
+        config = input_str["config"]
+        T_mat, Y_mat, Z_mat, W_mat, X_mat, T0, T1 = parse_data(config, filename)
         est = LinearDML(random_state=123)
-        est.fit(Y_mat,T_mat,X=X_mat,W=W_mat)
-        ate = est.ate(T0=T0,T1=T1,X=X_mat)
-        return f'ate : E(Y|T1) - E(Y|T0) is {ate}'
+        est.fit(Y_mat, T_mat, X=X_mat, W=W_mat)
+        ate = est.ate(T0=T0, T1=T1, X=X_mat)
+        return f"ate : E(Y|T1) - E(Y|T0) is {ate}"
     except Exception as e:
         return f"tools error : {str(e)}"
 
@@ -161,11 +187,11 @@ def Determine_collider(input_str):
     try:
         print("\n" + input_str)
         input_str = json.loads(input_str)
-        method = input_str["method"] if 'method' in input_str.keys() else None
-        activate_var = input_str['interesting_var']
+        method = input_str["method"] if "method" in input_str.keys() else None
+        activate_var = input_str["interesting_var"]
         filename = None
         cg = None
-        if 'cg_name' in input_str.keys():
+        if "cg_name" in input_str.keys():
             filename = input_str["cg_name"]
             cg, rela = memory.get(filename)
             if rela == Relationship.NO:
@@ -178,14 +204,19 @@ def Determine_collider(input_str):
         rela, varlist = has_collider(index_a, index_b, cg.G.graph)
 
         if rela == Relationship.YES:
-            return "There exists at least one collider {} of {} and {} ".format(node_names[varlist[0]],
-                                                                                activate_var[0],
-                                                                                activate_var[1])
+            return "There exists at least one collider {} of {} and {} ".format(
+                node_names[varlist[0]], activate_var[0], activate_var[1]
+            )
         if rela == Relationship.UNCERTAIN:
             return "Whether there exist collider of {} and {} is uncertain because some edge direction is uncertain. Following variables may be collider : ".format(
-                activate_var[0], activate_var[1]) + ','.join([node_names[i] for i in varlist])
+                activate_var[0], activate_var[1]
+            ) + ",".join(
+                [node_names[i] for i in varlist]
+            )
 
-        return "There don't exists collider between {} and {} ".format(activate_var[0], activate_var[1])
+        return "There don't exists collider between {} and {} ".format(
+            activate_var[0], activate_var[1]
+        )
     except Exception as e:
         return f"tool raise error : {e}"
 
@@ -195,11 +226,11 @@ def Determine_confounder(input_str):
         global folder, name_out_to_in, memory
         print("\n" + input_str)
         input_str = json.loads(input_str)
-        method = input_str["method"] if 'method' in input_str.keys() else None
-        activate_var = input_str['interesting_var']
+        method = input_str["method"] if "method" in input_str.keys() else None
+        activate_var = input_str["interesting_var"]
         filename = None
         cg = None
-        if 'cg_name' in input_str.keys():
+        if "cg_name" in input_str.keys():
             filename = input_str["cg_name"]
             cg, rela = memory.get(filename)
             if rela == Relationship.NO:
@@ -213,16 +244,23 @@ def Determine_confounder(input_str):
 
         if rela == Relationship.YES:
             return "yes，there is an unblocked backdoor path between {} and {} so confounder exists. Backdoor path : ".format(
-                varlist[0],
-                activate_var[0]) + ','.join([node_names[i] for i in varlist])
+                varlist[0], activate_var[0]
+            ) + ",".join(
+                [node_names[i] for i in varlist]
+            )
         if rela == Relationship.UNCERTAIN:
-            paths = ''
+            paths = ""
             for p in varlist:
-                paths += "\n" + ','.join([node_names[i] for i in p])
-            return "Whether there exist confounder between {} and {} is uncertain because some edge direction is uncertain. Following paths may be backdoor path : ".format(
-                activate_var[0], activate_var[1]) + paths
+                paths += "\n" + ",".join([node_names[i] for i in p])
+            return (
+                "Whether there exist confounder between {} and {} is uncertain because some edge direction is uncertain. Following paths may be backdoor path : ".format(
+                    activate_var[0], activate_var[1]
+                )
+                + paths
+            )
         return "No, no unblocked backdoor paths exist between {} and {}. So don't exist confounder".format(
-            activate_var[0], activate_var[1])
+            activate_var[0], activate_var[1]
+        )
     except Exception as e:
         return f"tool raise error : {e}"
 
@@ -235,77 +273,94 @@ def Determine_edge_direction(input_str):
         filename = None
         cg = None
 
-        if 'cg_name' in input_str.keys():
+        if "cg_name" in input_str.keys():
             filename = input_str["cg_name"]
             cg, rela = memory.get(filename)
             if rela == Relationship.NO:
                 return cg
         else:
             return f"missing cg_name parameter.please input cg_name."
-        method = input_str["method"] if 'method' in input_str.keys() else None
-        activate_var = input_str['interesting_var']
+        method = input_str["method"] if "method" in input_str.keys() else None
+        activate_var = input_str["interesting_var"]
         node_names = [str(i) for i in cg.G.nodes]
         index_a = node_names.index(activate_var[0])
         index_b = node_names.index(activate_var[1])
         a_to_b = cg.G.graph[index_a][index_b]
         b_to_a = cg.G.graph[index_b][index_a]
-        prefix = ''
+        prefix = ""
         if a_to_b == -1 and b_to_a == 1:
-            return prefix + activate_var[0] + " is a directly cause of " + activate_var[
-                1] + ".The opposite is not true"
+            return (
+                prefix
+                + activate_var[0]
+                + " is a directly cause of "
+                + activate_var[1]
+                + ".The opposite is not true"
+            )
         elif a_to_b == 1 and b_to_a == -1:
-            return prefix + activate_var[1] + " is a cause of " + activate_var[
-                0] + ".The opposite is not true"
+            return (
+                prefix
+                + activate_var[1]
+                + " is a cause of "
+                + activate_var[0]
+                + ".The opposite is not true"
+            )
         elif a_to_b == -1 and b_to_a == -1:
-            return prefix + f"An undirected edge exists between  {activate_var[0]} and {activate_var[1]}, which means they are not independent. However, the direction of causality between the two variables is uncertain."
+            return (
+                prefix
+                + f"An undirected edge exists between  {activate_var[0]} and {activate_var[1]}, which means they are not independent. However, the direction of causality between the two variables is uncertain."
+            )
         else:
-            return prefix + f"There is no direct edge linking  {activate_var[0]} and {activate_var[1]}.{activate_var[0]} doesn't directly cause {activate_var[1]}."
+            return (
+                prefix
+                + f"There is no direct edge linking  {activate_var[0]} and {activate_var[1]}.{activate_var[0]} doesn't directly cause {activate_var[1]}."
+            )
     except Exception as e:
         return str(e)
 
 
 empty_tools = Tool(
-    name='empty',
+    name="empty",
     func=empty,
-    description='''If no action needed ,use this tool. Use this tool default. Input is original response\n'''
+    description="""If no action needed ,use this tool. Use this tool default. Input is original response\n""",
 )
 collider = Tool(
-    name='Determine_collider',
+    name="Determine_collider",
     func=Determine_collider,
-    description='''You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a collider between two variables(ie common effect), we use this tool and the input is {"cg_name":...,"interesting_var":[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and may be the variable name of the collider. Make sure the causal graph has been generated before using this tool\n'''
+    description="""You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a collider between two variables(ie common effect), we use this tool and the input is {"cg_name":...,"interesting_var":[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and may be the variable name of the collider. Make sure the causal graph has been generated before using this tool\n""",
 )
 confound = Tool(
-    name='Determine_confounder',
+    name="Determine_confounder",
     func=Determine_confounder,
-    description='''You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a cofounder (ie common cause) between two variables, we use this tool and the input is {"cg_name":...,"interesting_var":[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and the backdoor path that may lead to the existence of the cofounder. Make sure the causal graph has been generated before using this tool\n'''
+    description="""You should first generate causal graph and then use this tool. Useful When we are interested in whether there is a cofounder (ie common cause) between two variables, we use this tool and the input is {"cg_name":...,"interesting_var":[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is yes or no or uncertainty and the backdoor path that may lead to the existence of the cofounder. Make sure the causal graph has been generated before using this tool\n""",
 )
 edge_direction = Tool(
-    name='Determine_edge_directions',
+    name="Determine_edge_directions",
     func=Determine_edge_direction,
-    description='''You should first generate causal graph and then use this tool.Useful when we are interested in whether there is a direct edge between two variables and the direction of the edge (such as determining whether A directly leads to B)., we use this tool and the input is {"cg_name"=...,"interesting_var"=[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is the relationship of two variables (ie A cause B). Make sure the causal graph has been generated before using this tool\n'''
+    description="""You should first generate causal graph and then use this tool.Useful when we are interested in whether there is a direct edge between two variables and the direction of the edge (such as determining whether A directly leads to B)., we use this tool and the input is {"cg_name"=...,"interesting_var"=[...]}, where interesting_var is what Variable we want to test, cg_name is the name of causal generated by 'Generate Causal'.The output of the tool is the relationship of two variables (ie A cause B). Make sure the causal graph has been generated before using this tool\n""",
 )
 
 condition_independent_test_tools = Tool(
-    name='condition independent test',
+    name="condition independent test",
     func=condition_independent_test,
-    description='''Useful for when you need to test the *** independent or d-separate *** of variable A and variable B condition on variable C. input should be a json with format below {"filename":...,"interesting_var":[...],"condition":[...]},"interesting_var" is a list of variables user interested in. for example, if user want to test independent(d-separate) between X and Y condition on Z,W,Q , interesting_var is ["X","Y"], condition is ["Z","W","Q"]. condition is [] if no condition provided\n'''
+    description="""Useful for when you need to test the *** independent or d-separate *** of variable A and variable B condition on variable C. input should be a json with format below {"filename":...,"interesting_var":[...],"condition":[...]},"interesting_var" is a list of variables user interested in. for example, if user want to test independent(d-separate) between X and Y condition on Z,W,Q , interesting_var is ["X","Y"], condition is ["Z","W","Q"]. condition is [] if no condition provided\n""",
 )
 generate_causalgraph_tool = Tool(
-    name='Generate Causal',
+    name="Generate Causal",
     func=generate_causalgraph,
-    description='''Useful for when you need to generate causal graph (or partial causal graph). input should be a json with format below {"filename":...,"analyse_relationship":...,"interesting_var":[...](Optional)}.if you want to analyse relationship between variables( such as cause effect, coufounder , Collider), analyse_relationship = "True" and please generate complete causal graph and  interesting_var is [](which means causal graph contain all variables) .if we only need to generate **partial causal graph** (for example, generate a partial causal graph for some variables), interesting_var is used and it's values are list of variables appear in causal graph and analyse_relationship is "False".Further more, if needed, you can analyse variables relationship in causal graph generated by this tool through these tools : Determine_collider,Determine_confounder,Determine_edge_direction\n'''
+    description="""Useful for when you need to generate causal graph (or partial causal graph). input should be a json with format below {"filename":...,"analyse_relationship":...,"interesting_var":[...](Optional)}.if you want to analyse relationship between variables( such as cause effect, coufounder , Collider), analyse_relationship = "True" and please generate complete causal graph and  interesting_var is [](which means causal graph contain all variables) .if we only need to generate **partial causal graph** (for example, generate a partial causal graph for some variables), interesting_var is used and it's values are list of variables appear in causal graph and analyse_relationship is "False".Further more, if needed, you can analyse variables relationship in causal graph generated by this tool through these tools : Determine_collider,Determine_confounder,Determine_edge_direction\n""",
 )
 ate_tool = Tool(
-    name='calculate CATE',
+    name="calculate CATE",
     func=ATE_sim,
-    description='''Useful for when you need to calculate (conditional) average treatment effect (ATE or CATE, etc. in math function is E(Y(T=T1)-Y(T=T0) | X=x) and means if we use treatment, what uplift we will get from treatment).This tool use double machine learn algorithm to calculate ate. input is  a json with format {"filename":...,config: {Y:[...],T:[...],X:[...],T0:...,T1:...} }. Y are names of outcome, T are names of treatment, X are names of covariate affect both T and Y (i.e. confounder). T1 and T0 are two different values of T that need to be calculated in ATE. you should extract each name from the description. If the meaning of X is unclear, leave X as []\n'''
+    description="""Useful for when you need to calculate (conditional) average treatment effect (ATE or CATE, etc. in math function is E(Y(T=T1)-Y(T=T0) | X=x) and means if we use treatment, what uplift we will get from treatment).This tool use double machine learn algorithm to calculate ate. input is  a json with format {"filename":...,config: {Y:[...],T:[...],X:[...],T0:...,T1:...} }. Y are names of outcome, T are names of treatment, X are names of covariate affect both T and Y (i.e. confounder). T1 and T0 are two different values of T that need to be calculated in ATE. you should extract each name from the description. If the meaning of X is unclear, leave X as []\n""",
 )
 
 
-llm = ChatOpenAI(temperature=0.5, openai_api_key=api_key,
-                 model_name="gpt-4o", openai_api_base='')
+llm = ChatOpenAI(
+    temperature=0.5, openai_api_key=api_key, model_name="gpt-4o", openai_api_base=""
+)
 
-prompt = hub.pull("hwchase17/react",api_key='')
+prompt = hub.pull("hwchase17/react", api_key="")
 
 ICL_lizi = """
 ##DEMO：
@@ -352,16 +407,45 @@ Final Answer:{{"answer":"uncertain"}}
 Answer the following questions with examples:
 
 """
-prompt.template = 'Answer the following questions as best you can. You have access to the following tools:\n\n{tools}\n\nUse the following format:\n\nQuestion: the input question you must answer\nThought: you should always think about what to do\nAction: the action to take, should be one of [{tool_names}]\nAction Input: the input to the action\nObservation: the result_gpt_3.5 of the action\n... (this Thought/Action/Action Input/Observation can repeat N times)\nThought: I now know the final answer\nFinal Answer: the final answer to the original input question\n\nCheck you output and make sure it conforms! Do not output an action and a final answer at the same time.\n\nBegin!\n\n'+ICL_lizi +'Question: {input}\nThought:{agent_scratchpad}'
+prompt.template = (
+    "Answer the following questions as best you can. You have access to the following tools:\n\n{tools}\n\nUse the following format:\n\nQuestion: the input question you must answer\nThought: you should always think about what to do\nAction: the action to take, should be one of [{tool_names}]\nAction Input: the input to the action\nObservation: the result_gpt_3.5 of the action\n... (this Thought/Action/Action Input/Observation can repeat N times)\nThought: I now know the final answer\nFinal Answer: the final answer to the original input question\n\nCheck you output and make sure it conforms! Do not output an action and a final answer at the same time.\n\nBegin!\n\n"
+    + ICL_lizi
+    + "Question: {input}\nThought:{agent_scratchpad}"
+)
 
 
-tools = [condition_independent_test_tools, generate_causalgraph_tool, empty_tools, ate_tool,collider,confound,edge_direction]
-agent = create_react_agent(llm, [condition_independent_test_tools, generate_causalgraph_tool, empty_tools, ate_tool,collider,confound,edge_direction], prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True,handle_parsing_errors="Check you output and make sure it conforms! Do not output an action and a final answer at the same time.")
+tools = [
+    condition_independent_test_tools,
+    generate_causalgraph_tool,
+    empty_tools,
+    ate_tool,
+    collider,
+    confound,
+    edge_direction,
+]
+agent = create_react_agent(
+    llm,
+    [
+        condition_independent_test_tools,
+        generate_causalgraph_tool,
+        empty_tools,
+        ate_tool,
+        collider,
+        confound,
+        edge_direction,
+    ],
+    prompt,
+)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    handle_parsing_errors="Check you output and make sure it conforms! Do not output an action and a final answer at the same time.",
+)
 
 
 data_loader = Dataloader()
-data_loader.read_data('./dataset_ate_gt.json')
+data_loader.read_data("./dataset_ate_gt.json")
 correct = 0
 summary = 0
 # os.remove('./result_gpt_3.5.jsonl')
@@ -373,8 +457,8 @@ memory = CGMemory()
 # name_out_to_in = ["age","weight","sleep time","cancer"]
 
 # resp = agent_executor.invoke({"input": "Consider four elements : age, weight, sleep time, cancer. With the advancement of age, individuals should pay closer attention to their weight and sleep duration, as these factors can significantly impact their overall health and the risk of developing cancer. Doctors are very interested in the relationship between these variables, and therefore, they have chosen to collect a set of data through experiments. Please assist the doctors in answering whether there is a collider of weight on cancer.if exist collider, please give it name. csv data store in ‘4_6_3.csv’ ."})
-output_name = 'gpt3.5-icl-medical.jsonl'
-output_name = 'gpt3.5-icl-ate.jsonl'
+output_name = "gpt4.1-icl-medical.jsonl"
+output_name = "gpt4.1-icl-ate.jsonl"
 skip_num = 0
 # with open(output_name,'r') as f:
 #     skip_num = len(f.readlines())
@@ -391,35 +475,43 @@ for index in range(664):
     #     #     json.dump(line, f, ensure_ascii=False)
     #     #     f.write('\n')
     #     continue
-    data = pd.read_csv(os.path.join('DGP_description/data', name), header=None)
+    data = pd.read_csv(os.path.join("DGP_description/data", name), header=None)
     data.columns = col
     name_out_to_in = col
-    if q_type in ['IT', "CIT", "MULTCIT", "CAUSE", 'Has-Collider', 'Has-Confounder']:
-        q = q + "\n Please output as json format {{'answer' : '...'}},answer should be one of ['yes','no','uncertain'],Do not output content other than JSON "
+    if q_type in ["IT", "CIT", "MULTCIT", "CAUSE", "Has-Collider", "Has-Confounder"]:
+        q = (
+            q
+            + "\n Please output as json format {{'answer' : '...'}},answer should be one of ['yes','no','uncertain'],Do not output content other than JSON "
+        )
     elif q_type not in ["ATE"]:
-        q = q + "\n Please only output the causal graph's name directly.output must be json format {{'answer' : '...'}},answer should be the name of the causal graph.you needn't really analyse relationship between variables."
+        q = (
+            q
+            + "\n Please only output the causal graph's name directly.output must be json format {{'answer' : '...'}},answer should be the name of the causal graph.you needn't really analyse relationship between variables."
+        )
     else:
-        q = q + "\n Please only output the value of ate.output must be json format {{'ate' : '...'}}"
+        q = (
+            q
+            + "\n Please only output the value of ate.output must be json format {{'ate' : '...'}}"
+        )
 
     print(q)
     memory = CGMemory()
     resp = agent_executor.invoke({"input": q})
     memory.clear()
-    line['output'] = resp['output']
+    line["output"] = resp["output"]
     print(f"{resp['output']}  gt: {gt}")
     if q_type in ["CAUSALKG", "PARTIAL_CG"]:
-        with open(os.path.join('DGP_description/causal_graph', gt), "r") as f:
+        with open(os.path.join("DGP_description/causal_graph", gt), "r") as f:
             with open("tempCG.txt", "r") as f2:
                 cg_str = f2.read()
             if f.read() == cg_str:
                 correct += 1
-                line['match'] = "MATCH"
+                line["match"] = "MATCH"
                 print("MATCH")
             else:
-                line['match'] = "MISMATCH"
+                line["match"] = "MISMATCH"
                 print("NOT MATCH")
 
-    with open(f'{output_name}', 'a+') as f:
+    with open(f"{output_name}", "a+") as f:
         json.dump(line, f, ensure_ascii=False)
-        f.write('\n')
-
+        f.write("\n")
